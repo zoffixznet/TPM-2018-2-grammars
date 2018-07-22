@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+		<meta charset="utf-8">
+
+		<title>Faster Perl 6 Programs</title>
+
+		<meta name="description" content="Perl 6: Grammars">
+		<meta name="author" content="Zoffix Znet">
+
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/beige.css" id="theme">
+		<!-- <link rel="stylesheet" href="css/theme/solarized.css" id="theme"> -->
+    <link rel="stylesheet" href="css/theme/custom.css">
+
+		<!-- For syntax highlighting -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+		<script>
+			if( window.location.search.match( /print-pdf/gi ) ) {
+				var link = document.createElement( 'link' );
+				link.rel = 'stylesheet';
+				link.type = 'text/css';
+				link.href = 'css/print/pdf.css';
+				document.getElementsByTagName( 'head' )[0].appendChild( link );
+			}
+		</script>
+
+		<!--[if lt IE 9]>
+		<script src="lib/js/html5shiv.js"></script>
+		<![endif]-->
+	</head>
+
+	<body>
+
+		<div class="reveal">
+			<!-- Any section element inside of this container is displayed as a slide -->
+			<div class="slides">
+				<section>
+					<h2 style="font-size: 300%;">Faster Perl 6 Programs</h2>
+          <p>Tips and tricks for better performance in Perl 6</p>
+
+          <div class="intro-ref" style="font-size: 140%">
+						<p>
+							<small>by</small><br>
+							<span style="font-size: 210%">Zoffix Znet</span>
+							<br>
+							Perl 6 Core Dev<br>
+
+	  					<a href="https://twitter.com/zoffix/"><img src="twitter-128.png" alt="" height=25 style="border: 0!important; display: inline!important; vertical-align: -.1em;"> @zoffix</a>
+	          </p>
+          </div>
+
+          <!--p style="padding-top: 20px">This presentation is available at <a href="http://TMP2016-2.zoffix.com/">TPM2016-2.zoffix.com</a></p-->
+
+					<p style="padding-top: 20px;"><small style="opacity: .4">Use left/right arrows on keyboard (or tap and slide) to navigate
+							the slides.</small></p>
+				</section>
+
+				<section>
+					<h2>Perl 6 Is New</h2>
+
+					<ul>
+						<li>First stable language release: December 25, 2015</li>
+						<li>Lots of optimizations are yet to be done</li>
+						<li>Largely a volunteer-driven project</li>
+					</ul>
+				</section>
+
+				<section>
+					<h2>Performance Landscape</h2>
+
+					<p>More uneven in Perl 6 than in older languages.</p>
+					<img src="2018-pics/perf1.png" alt="">
+					<p>Some things are a lot slower,<br>while others are
+							slightly faster.</p>
+
+				</section>
+
+				<section>
+					<h2>Solution</h2>
+
+					<p>Wait for core devs to make things better?</p>
+					<pre><code class="perl">
+for ^10_000_000 {
+    my $set := set 1, 2, 3, 4
+}
+
+# 2018.06:  81 seconds
+# 2018.07:  .5 seconds
+					</code></pre>
+				</section>
+
+				<section>
+					<h2>Solution</h2>
+
+					<p>Avoid the peaks.</p>
+					<img src="2018-pics/perf2.png" alt="">
+				</section>
+
+				<section>
+					<h2>Some Tips</h2>
+
+					<ul>
+						<li>Keep it simple</li>
+						<li>Pay attention to numeric types</li>
+            <li>Regexes aren't fast (yet)</li>
+						<li>Use native types</li>
+            <li>Use the built-in profiler</li>
+					</ul>
+
+          <p style="padding-top: 20px">Also, <a href="https://github.com/rakudo/rakudo/issues/new">bug-report really slow stuff</a>.</p>
+				</section>
+
+				<section>
+					<h2>Keep it simple</h2>
+
+					<ul>
+						<li>Use just enough features to get the job done</li>
+						<li>Obscure, "clever" feature combinations are more
+							likely to be unoptimized than the more common stuff</li>
+					</ul>
+				</section>
+
+				<section>
+					<h2>Keep it simple</h2>
+
+					<p>Do you <i>really</i> need all those type checks?</p>
+
+					<pre><code class="perl">
+multi rev-cos (Num $v) { $v.flip.cos }
+multi rev-cos (
+    *@stuff where .all ~~ Num|Int|Rat --> Array[Num]
+) {
+    Array[Num].new: @stuff.map: *.flip.cos
+}
+
+rev-cos ^100_000; # 3.86 seconds
+
+</code></pre>
+				</section>
+
+        <section>
+          <h2>Keep it simple</h2>
+
+          <p>The dynamic optimizer will cheapen or even remove some of the
+            type checks, but things like <code>where</code> refinements and
+            conversion of <code>Seq</code> type (returned from <code>.map</code>) to an <code>Array</code> have cost</p>
+
+					<pre><code class="perl">
+… *@stuff where .all ~~ Num|Int|Rat …
+
+Array[Num].new: …
+
+</code></pre>
+				</section>
+
+				<section>
+					<h2>Keep it simple</h2>
+
+					<p>Almost the same functionality, but the code is now shorter
+            and 2.7x as fast:</p>
+
+					<pre><code class="perl">
+multi rev-cos (Num $v) { $v.flip.cos }
+multi rev-cos (*@stuff) {
+    @stuff.map: *.flip.cos
+}
+rev-cos ^100_000; # 1.43 seconds
+
+</code></pre>
+				</section>
+
+				<section>
+					<h2>Keep it simple</h2>
+
+					<p>In Perl 6, you can specify alternatives in regex by using a list:</p>
+
+					<pre><code class="perl">
+my @alts := &lt;foo bar ber&gt;;
+say "myfoo and mybar".match: :g, /my @alts/
+
+# OUTPUT: «(｢myfoo｣ ｢mybar｣)␤»
+
+</code></pre>
+				</section>
+
+
+				<section>
+					<h2>Keep it simple</h2>
+
+					<p>You can also execute arbitrary code in code blocks and get
+							the result treated as a regex:</p>
+
+					<pre><code class="perl">
+say "480 481 482" ~~ /4 <{'\d' ~ ^3 .pick}>/
+# OUTPUT: ｢481｣
+
+</code></pre>
+				</section>
+
+				<section>
+					<h2>Keep it simple</h2>
+
+					<p>Here's an idea: match an IPv4 address by making a list of
+						valid values for each octet with a Range operator (<code>..</code>) inside a code block (<code>{ }</code>) inside our regex:</p>
+
+					<pre><code class="perl">
+say "127.0.0.1" ~~ /^ <{ 0 .. 255 }>**4 % \. $/
+
+</code></pre>
+					<p>Very simple, if you know Perl 6 regex syntax,
+						<br>but it's
+					slow: <strong>8.2 seconds</strong> (there's even a
+					<a href="https://github.com/rakudo/rakudo/issues/2013">filed
+					ticket</a> for it).</p>
+
+				</section>
+
+				<section>
+					<h2>Keep it simple</h2>
+
+					<pre><code class="perl">
+say "127.0.0.1" ~~ /^ <{ 0 .. 255 }>**4 % \. $/
+
+</code></pre>
+					<ul>
+						<li>We use a code block  (<code>{ }</code>); can't cache its evaluation</li>
+						<li>It's called four times for each octet</li>
+						<li>Each time we create a regex from that list</li>
+            <li>Each has 256 alternatives, which is 1,024 alternatives in total</li>
+            <li>(probably some other cause as well;
+              that's why there's
+    					<a href="https://github.com/rakudo/rakudo/issues/2013"
+                >ticket</a>)</li>
+					</ul>
+				</section>
+
+				<section>
+					<h2>Keep it simple</h2>
+
+					<ul>
+						<li>Move alternatives out</li>
+						<li>No more code blocks run for each octet</li>
+						<li>Now only 256 alternatives, repeated 4 times</li>
+					</ul>
+
+					<pre><code class="perl">
+my @alts = ^256;
+say "127.0.0.1" ~~ /^ @alts**4 % \. $/
+
+</code></pre>
+					<p>New time? <strong>0.05s, which is 163x faster</strong>.</p>
+				</section>
+
+				<section>
+					<h2>Pay attention to numeric types</h2>
+
+          <pre><code>
+sub calc (\n) { (1 + .123/n) ** n }
+say calc 50_000;
+
+# A SINGLE calculation: 19.73 seconds…   huh?
+
+</code></pre>
+				</section>
+
+				<section>
+					<img src="2018-pics/no-time.jpg" alt="" style="box-shadow: none">
+				</section>
+
+        <section>
+          <h2>Pay attention to numeric types</h2>
+
+          <p>Change <code>.123</code> to <code>.123e0</code>, to
+            <br>use <code>Num</code> (floating point type) type
+          for calculation<br> instead of <code>Rat</code> (rational type)</p>
+          <pre><code>
+sub calc (\n) { (1 + .123e0/n) ** n }
+calc 50_000 for ^1000_000;
+
+# A MILLION calculations: 0.93 seconds
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Pay attention to numeric types</h2>
+
+          <p>Mark the routine with <code>is pure</code> trait,<br>
+            so it gets constant-folded at compile time:</p>
+          <pre><code>
+sub calc (\n) is pure { (1 + .123e0/n) ** n }
+calc 50_000 for ^1000_000;
+
+# Run time: 0.32 seconds
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Regexes Aren't Fast (Yet)</h2>
+
+          <ul>
+            <li>Few optimizations have been done to them</li>
+            <li>Richer data structures than in other languages like Perl 5: produce a tree of <code>Match</code> objects; not plain text</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Regexes Aren't Fast (Yet)</h2>
+
+          <p>Does it start with a particular string?</p>
+          <pre><code>
+my $x = "foo bar ber";
+$x ~~ /^foo/ for ^1000_000;
+
+# 9.2 seconds
+
+</code></pre>
+        </section>
+
+
+        <section>
+          <h2>Regexes Aren't Fast (Yet)</h2>
+
+          <p>Use more appropriate string routines, where available:</p>
+          <pre><code>
+my $x = "foo bar ber";
+$x.starts-with: 'foo' for ^1000_000;
+
+# 0.12 seconds
+
+</code></pre>
+
+        <p><code>.starts-with</code>, <code>.ends-with</code>,
+          <code>.contains</code>, <code>.trim</code>, <code>.subst</code>, <code>.comb</code></p>
+        </section>
+
+
+        <section>
+          <h2>Use Native Types</h2>
+
+          <p>Native types are written in lowercase (<code>int</code>,
+            <code>int32</code>, <code>num</code>, etc.). They use the
+            representation provided by the virtual machine, operating system,
+            and hardware.</p>
+          <pre><code>
+my num32 @array;
+my uint $i;
+sub foo(int8 $v) { … }
+
+class Foo {
+    has int32 $.attr;
+}
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Use Native Types</h2>
+
+          <p>Let's measure Perl 6 against another language:</p>
+          <pre><code>
+# using Perl 5.28.0
+use strict;
+use warnings;
+
+my @array;
+my $i = 0;
+push @array, ++$i while $i &lt; 5_000_000;
+
+# 0.4 seconds in Perl 5
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Use Native Types</h2>
+
+          <p>Let's measure Perl 6 against another language:</p>
+          <pre><code>
+# using Rakudo Perl 6 2018.06-233-gbf514c150
+my @array;
+my $i = 0;
+@array.push: ++$i while $i &lt; 5_000_000;
+
+# 6.2 seconds in Perl 6
+</code></pre>
+        </section>
+
+				<section>
+					<img src="2018-pics/solid-F.png" alt="" style="box-shadow: none">
+				</section>
+
+        <section>
+          <h2>Use Native Types</h2>
+
+          <p>We can use native types here!</p>
+          <pre><code>
+my int @array;
+my int $i;
+@array.push: ++$i while $i &lt; 5_000_000;
+
+
+</code></pre>
+        </section>
+
+
+        <section>
+          <h2>Use Native Types</h2>
+
+          <p>We can use native types here!</p>
+          <pre><code>
+my int @array;
+my int $i;
+@array.push: ++$i while $i &lt; 5_000_000;
+
+# 0.14 seconds  (0.27 seconds if you include startup time)
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Use Native Types</h2>
+
+          <p>Native types made our program 43x faster.</p>
+          <p>It's now 50% faster than Perl 5.</p>
+        </section>
+
+
+				<section>
+					<img src="2018-pics/solid-F-corrected.png"
+            alt="" style="box-shadow: none">
+				</section>
+
+
+        <section>
+          <h2>Use Native Types</h2>
+
+          <p>Keep in mind native types are unboxed and don't have any
+          methods! Method calls cause autoboxing (convertion to non-native version) to occur and can cause a performance          <em>penalty</em>:</p>
+
+          <pre><code class="perl">
+my     $x = -42; $x.abs for ^1000_000; # 0.29 seconds
+my int $x = -42; $x.abs for ^1000_000; # 0.48 seconds
+          </code></pre>
+        </section>
+
+        <section>
+          <h2>Use Native Types</h2>
+
+          <p>Use subroutine forms of various routines, if available:</p>
+
+          <pre><code class="perl">
+my     $x = -42; $x.abs for ^1000_000; # 0.29 seconds
+my int $x = -42; abs $x for ^1000_000; # 0.08 seconds
+          </code></pre>
+        </section>
+
+
+        <section>
+          <h2>Use The Built-in Profiler</h2>
+
+          <p>See <a href="https://docs.perl6.org/language/performance"
+            >docs.perl6.org/language/performance</a> for details.</p>
+
+          <pre><code class="perl">
+sub calc (\n) { (1 + .123/n) ** n }
+say calc 50_000;
+          </code></pre>
+          <pre><code class="perl">
+$ perl6 --profile --profile-filename=out.html script.p6
+$ google-chrome out.html
+          </code></pre>
+        </section>
+
+        <section>
+          <h2>Use The Built-in Profiler</h2>
+
+          <img src="2018-pics/profile.png" alt="" style="box-shadow: none">
+
+          <p>The <code style="font-size: 80%!important">SETTING::</code> stuff references core code. It's often
+            mostly Perl&nbsp;6 code, which you can find in
+            <a href="https://github.com/rakudo/rakudo/"
+              >github.com/rakudo/rakudo/</a> </p>
+        </section>
+
+        <section>
+          <h2>Use The Built-in Profiler</h2>
+
+          <p><a href="http://news.perlfoundation.org/2017/09/grant-proposal-rakudo-perl-6-p.html">Improvements are being worked on</a>,<br>
+            funded by <a href="https://donate.perlfoundation.org/"
+              >The Perl Foundation</a></p>
+
+          <img src="2018-pics/tpf.png" alt="">
+        </section>
+
+        <section>
+          <h2>Ask The Community</h2>
+
+          <p>Trying to optimize a particularly hot loop? Get help from our
+            friendly humans and robots on our community support chat at
+            <a href="irc://irc.freenode.net/perl6">irc.freenode.net/#perl6</a>
+            <br>(you can use the web interface on <a href="https://perl6.org/irc">perl6.org/irc</a>)</p>
+        </section>
+
+				<section>
+					<h2 style="font-size: 370%">The End</h2>
+
+          <hr>
+
+          <p>visit</p>
+					<h2 style="font-size: 270%"><a style="color: #444" href="https://perl6.party">perl6.party</a></h2>
+
+					<img src="2018-pics/logo-transparent-soft-black.png" alt=""
+            style="box-shadow: none" width=250>
+
+					<hr>
+
+					<p style="font-size: 170%">Thank you!</p>
+				</section>
+			</div>
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.min.js"></script>
+
+		<script>
+
+			// Full list of configuration options available here:
+			// https://github.com/hakimel/reveal.js#configuration
+			Reveal.initialize({
+				controls: false,
+				progress: true,
+				history: true,
+				center: true,
+
+                width: 960,
+                height: 700,
+
+				theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+				transition: Reveal.getQueryHash().transition || 'none',
+
+				// Parallax scrolling
+				// parallaxBackgroundImage: 'https://s3.amazonaws.com/hakim-static/reveal-js/reveal-parallax-1.jpg',
+				// parallaxBackgroundSize: '2100px 900px',
+
+				// Optional libraries used to extend on reveal.js
+				dependencies: [
+					{ src: 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+					{ src: 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+					{ src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+					{ src: 'plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+					{ src: 'plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }
+				]
+			});
+
+		</script>
+
+	</body>
+</html>
