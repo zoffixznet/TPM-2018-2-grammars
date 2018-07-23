@@ -367,13 +367,13 @@ say 'I love "Perl" and "Perl 6"'
 
           <p>Use dollar sign, followed by the name and equals sign. The next atom will get captured (use square brackets to group multiple atoms for capture).</p>
           <pre><code class="plain">
-say '2018-07-26T19:20:33-04:00' ~~ /
+say '2018-07-26T19:00:00-04:00' ~~ /
     $&lt;year&gt;=\d**4 '-' $&lt;month&gt;=\d**2 '-' $&lt;day&gt;=[\d\d]
   T $&lt;time&gt;=[\d\d]**3 % ':'
 /;
 
 say "TPM $&lt;year month day&gt;.join('.') is at $&lt;time&gt;"
-# OUTPUT: «TPM 2018.07.26 is at 19:20:33␤»
+# OUTPUT: «TPM 2018.07.26 is at 19:00:00␤»
         </code></pre>
         </section>
 
@@ -395,6 +395,153 @@ say "$m[0] $m&lt;how> $m&lt;what>"; # OUTPUT: «I love Perl 6␤»
 
 </code></pre>
         </section>
+
+        <section>
+          <h2>Named Captures</h2>
+          <p>Couple of modifiers for named captures:</p>
+          <pre><code class="perl">
+&lt;foo&gt;       # match regex `foo` and capture under `foo`
+&lt;.foo&gt;      # match, but don't capture
+&lt;bar=.foo&gt;  # match, but name capture `bar` (in grammars)
+&lt;bar=.&ampfoo&gt; # same as above, but used for standalone regexes
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Overload?</h2>
+          <p>Is your brain melting yet from all the new info?</p>
+          <img src="2018-pics/cat-exhausted.jpg" alt="">
+        </section>
+
+        <section>
+          <h2>P5 mode</h2>
+          <p>Use <code>:P5</code> adverb on regexes to enable<br>Perl 5's (PCRE+) regex mode:</p>
+          <pre><code class="perl">say &quot;barbarbaz&quot; ~~ m:P5/(?&lt;!foo)bar(?=baz)/;
+# OUTPUT: &laquo;｢bar｣␤&raquo;
+
+say &quot;foo bar&quot; ~~ m:P5/foo ([a-r]+)/;
+# OUTPUT: &laquo;｢foo bar｣
+#            0 =&gt; ｢bar｣␤&raquo;
+</code></pre>
+          <p>Most features from Perl 5.10 are available.<br>Good as training wheels while learning Perl&nbsp;6 regex,<br>but is rarely used by Perl&nbsp;6 users</p>
+        </section>
+
+
+        <section>
+          <h2>Complex Regexes</h2>
+
+          <p>Let's break up our date-time matching regex:</p>
+          <pre><code class="plain">
+my regex date {
+    $&lt;year&gt;=\d**4 '-' $&lt;month&gt;=\d**2 '-' $&lt;day&gt;=[\d\d]
+}
+my regex time { $&lt;clock&gt;=[\d\d]**3 % ':' $&lt;tz&gt;=.+ }
+my regex date-time { &lt;date&gt; T &lt;time&gt; }
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Complex Regexes</h2>
+
+          <p>Matching with it produces a tree of <code>Match</code> objects, with all our
+            named captures inside:</p>
+          <pre><code class="plain">
+say '2018-07-26T19:00:00-04:00' ~~ &amp;date-time;
+
+# OUTPUT: «｢2018-07-26T19:00:00-04:00｣
+#             date => ｢2018-07-26｣
+#                year => ｢2018｣
+#                month => ｢07｣
+#                day => ｢26｣
+#             time => ｢19:00:00-04:00｣
+#                clock => ｢19:00:00｣
+#                tz => ｢-04:00｣␤»
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Complex Regexes</h2>
+
+          <p>And we can access individual things, just like if it were a nested hash:</p>
+          <pre><code class="plain">
+'2018-07-26T19:00:00-04:00' ~~ &amp;date-time;
+say "In $&lt;date&gt;&lt;year&gt; TPM had a meeting at $&lt;time&gt;&lt;clock&gt;";
+
+# OUTPUT: «In 2018 TPM had a meeting at 19:00:00␤»
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Grammars Are Like Classes</h2>
+
+          <p>Standalone regexes are like standalone methods</p>
+          <pre><code class="plain">
+my regex  re { ...               }
+my method me { self.substr: 0, 3 }
+
+say 'foobar' ~~ &amp;re; # OUTPUT: «｢foo｣␤»
+say 'foobar' ~~ &amp;me; # OUTPUT: «foo␤»
+
+</code></pre>
+        <p><small>standalone methods are just fancier subs. The first argument becomes
+        the invocant.</small></p>
+        </section>
+
+
+        <section>
+          <h2>Grammars Are Like Classes</h2>
+
+          <p>Methods are kept in <strong>classes</strong>.
+            <br>Regexes are kept in <strong>grammars</strong>.</p>
+          <pre><code class="perl">
+grammar Re { regex  re { ...                 } }
+class   Me { method me (\v) { v.substr: 0, 3 } }
+
+say Re.subparse: 'foobar', :rule&lt;re&gt;; # OUTPUT: «｢foo｣␤»
+say Me.me:       'foobar';            # OUTPUT: «foo␤»
+
+</code></pre>
+        <p style="font-size: 80%">Default thing grammars start to parse with is <code>TOP</code>;
+          <br>here, we override that to <Code>re</Code> regex.</p>
+        </section>
+
+
+        <section>
+          <h2>Grammars Are Like Classes</h2>
+          <p>You can subclass grammars and mix in roles into them…</p>
+          <pre><code class="perl">grammar GDate {
+    regex TOP {
+        $&lt;year&gt;=\d**4 '-' $&lt;month&gt;=\d**2 '-' $&lt;day&gt;=[\d\d]
+    }
+}
+role GDateTime is GDate {
+    regex time { $&lt;clock&gt;=[\d\d]**3 % ':' $&lt;tz&gt;=.+ }
+    regex date-time { &lt;date=.GDate::TOP&gt; [T &lt;time&gt;]? }
+}
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Grammars Are Like Classes</h2>
+          <p>…and even define regular methods:</p>
+          <pre><code class="perl">grammar TPM does GDateTime {
+    regex TOP { &lt;date-time&gt; }
+    method when (\date) {
+        self.parse: date;
+        say &quot;TPM had a meeting at "
+          ~ $&lt;date-time&gt;&lt;time&gt;&lt;clock&gt;
+    }
+}
+TPM.when: '2018-07-26T19:00:00-04:00'
+# OUTPUT: &laquo;TPM had a meeting at 19:00:00␤&raquo;
+</code></pre>
+        </section>
+
+
 
         <section>
           <h2>Ask The Community</h2>
