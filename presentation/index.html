@@ -99,42 +99,15 @@
 				<section>
 					<h2>Whitespace can be freely used</h2>
 
-          <p>Alpha-numeric chars can be used as is.<br>Others, simply quote
+          <p>Literal strings: alpha-numeric chars can be used as-is.<br>Others, simply quote
             or backslash them:</p>
 					<pre><code class="perl">
 say so "I ♥ Perl 6" ~~ /I \♥ Perl 6/;    # False
 say so "I ♥ Perl 6" ~~ / 'I ♥ Perl 6' /; # True
 say so "I ♥ Perl 6" ~~ /
-    :sigspace  # You can enable significant
-               # whitespace with an adverb.
-    I \♥       # Oh, and comments can be
-    Perl 6     # used as well.
+    I #`(BTW, you can use inline,) " ♥ "
+    "Perl 6" # as well as end-of-line comments
 /; # True
-
-</code></pre>
-				</section>
-
-				<section>
-					<h2>Square Brackets</h2>
-
-          <p>Are used for <strong>non-capturing</strong> grouping:</p>
-					<pre><code class="perl">
-say "I love Perl 6" ~~ /
-    I \s+ [really \s+]? 'love Perl 6'
-/;  # OUTPUT: «｢I love Perl 6｣␤»
-
-</code></pre>
-				</section>
-
-				<section>
-					<h2>Parentheses</h2>
-
-          <p>Are still used for <strong>capturing</strong> grouping:</p>
-					<pre><code class="perl">
-say "I love Perl 6" ~~ /
-    I \s+ (\w+) ' Perl 6'
-/;  # ｢I love Perl 6｣
-    #   0 => ｢love｣
 
 </code></pre>
 				</section>
@@ -154,6 +127,196 @@ say so "the other stuff" ~~ /<$stuff>/; # True
 				</section>
 
 				<section>
+					<h2>Square Brackets</h2>
+
+          <p>Are used for <strong>non-capturing</strong> grouping:</p>
+					<pre><code class="perl">
+say "I really love Perl 6" ~~ /
+    I \s+ [really \s+]? 'love Perl 6'
+/;  # OUTPUT: «｢I really love Perl 6｣␤»
+
+</code></pre>
+				</section>
+
+				<section>
+					<h2>Parentheses</h2>
+
+          <p>Are still used for <strong>capturing</strong> grouping:</p>
+					<pre><code class="perl">
+say "I love Perl 6" ~~ /
+    I \s+ (\w+) ' Perl 6'
+/;  # OUTPUT: «｢I love Perl 6｣
+    #             0 => ｢love｣␤»
+
+</code></pre>
+				</section>
+
+
+				<section>
+					<h2>Same as in PCRE…</h2>
+
+          <p>Some things remained the same:</p>
+					<pre><code class="perl">
+say "I love Perl 6" ~~ /
+    ^ . \s+ \S+ .? \w+ .*? \d+ $
+/;  # OUTPUT: «｢I love Perl 6｣␤»
+
+</code></pre>
+				</section>
+
+				<section>
+					<h2>…EXCEPT</h2>
+
+          <p>The <code>^</code> and <code>$</code> have simpler meaning: start and end of <strong>string</strong>—no other magic. <Code>^^</Code> and <code>$$</code> are for start and end of <strong>line</strong> (before "\n", which is not included).</p>
+					<pre><code class="perl">
+say so "foo\n" ~~ /^ foo $/;    # False
+say so "foo\n" ~~ /^ foo \n $/; # True
+say so "foo\nbar" ~~ /^ foo $$ \n ^^ bar $/; # True
+
+</code></pre>
+				</section>
+
+				<section>
+					<h2>Uhhh…</h2>
+
+          <p>So… <code>\s+</code> hell?</p>
+					<pre><code class="perl" style="text-align: center">
+/^ I \s+ truly \s+ madly \s+ deeply
+    \s+ love  \s+ Perl  \s+ 6 \n  $/
+
+</code></pre>
+
+          <img src="2018-pics/cat-scared.jpg" alt="">
+				</section>
+
+				<section>
+					<h2>Sigspace</h2>
+
+          <p> Nope: use <code>:sigspace</code> (<code>:s</code> is shorter)<br>(in grammars: declare <code>rule</code> instead of <code>token</code>)</p>
+					<pre><code class="perl" style="text-align: center">
+/^ :s I truly madly deeply love Perl 6 $/
+
+</code></pre>
+
+          <img src="2018-pics/cat-happy.jpg" alt="">
+				</section>
+
+        <section>
+					<h2>Sigspace</h2>
+
+          <p>Automatically puts <code>&lt;.ws&gt;</code> token between atoms in the regex,
+          which by default matches whitespace (<code>\s+</code>) or a word boundary</p>
+					<pre><code class="perl">
+say so "This is neat!" ~~ /
+  :s  This    is     neat \!
+/; # True
+
+say so "This is neat!" ~~ /
+  :s  T h i s i s n e a t \!
+/; # False
+
+</code></pre>
+				</section>
+
+
+        <section>
+					<h2>Character Classes</h2>
+
+          <p>Same as before, <code>[…]</code>, except also add angle brackets (using angle brackets for special stuff is a common pattern)</p>
+					<pre><code class="perl">
+say "I love Perl 6" ~~ /<[a..zIP\d\s]>+/
+# OUTPUT: «｢I love Perl 6｣␤»
+
+</code></pre>
+          <p>Ranges use <code>..</code> instead of <code>-</code></p>
+				</section>
+
+
+        <section>
+					<h2>Character Classes</h2>
+
+          <p>To negate a character class, stick a<br>minus before the square brackets:</p>
+					<pre><code class="perl">
+say "I love Perl 6" ~~ /<-[I]> <-[A..Z]>+ \s+ \d+/
+# OUTPUT: «｢Perl 6｣»
+
+</code></pre>
+				</section>
+
+        <section>
+          <h2>Character Classes</h2>
+
+          <p>You can make custom classes by adding/subtracting existing classes. Use plus instead
+          of minus to add stuff:</p>
+          <pre><code class="perl">
+say "Awesome Perl 6" ~~ /<[\w]-[a..z]+[erl]>**4/
+# OUTPUT: «｢Perl｣»
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Character Classes</h2>
+
+          <p>Matching Unicode properties:<br>use a <a
+              href="https://rakudo.party/post/Perl-6-Colonpairoscopy">colonpair</a> inside angle brackets:</p>
+          <pre><code class="perl">
+say "Я люблю Perl 6" ~~ /<:Script('Latin')>+/
+# OUTPUT: «｢Perl｣»
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Character Classes</h2>
+
+          <p>Can negate Unicode properties or mix and match them with other character classes:</p>
+          <pre><code class="perl">
+say "Я люблю Perl 6" ~~ /<-:Script('Latin')>+/
+# OUTPUT: «｢Я люблю ｣»
+
+say "Я люблю Perl 6" ~~ /<:Script('Latin')  +[\d\s]>**4..*/
+# OUTPUT: «｢ Perl 6｣»
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Quantifier modifier</h2>
+
+          <p>Match stuff separated with stuff:</p>
+          <pre><code class="perl">
+say "this,is,a,really,neat,feature"
+  ~~ /(\w+)**3 % ',' $/
+
+# OUTPUT: «｢really,neat,feature｣
+#             0 => ｢really｣
+#             0 => ｢neat｣
+#             0 => ｢feature｣»
+
+</code></pre>
+          <p style="font-size: 90%">Capture a "word" <code>(\w+)</code>, and we want three of them <code>**3</code>,
+            separated by commas <code>% ','</code>, anchored to end of string <code>$</code></p>
+        </section>
+
+
+        <section>
+          <h2>Alternations</h2>
+
+          <p>Choice of Longest Token Matching (LTM) <code>|</code><br>or
+            first-listed matching <code>||</code>:</p>
+          <pre><code class="perl">
+say "Perler" ~~ / [Perl |  \w+] /;
+# OUTPUT: «｢Perler｣» # this alternative is the longest
+
+say "Perler" ~~ / [Perl || \w+] /;
+# OUTPUT: «｢Perl｣»
+# this alternative was the first listed in our regex
+
+</code></pre>
+        </section>
+
+				<section>
 					<h2>Content of variables</h2>
 
           <p>Lists get interpreted as a list of alternatives to match:</p>
@@ -166,6 +329,72 @@ say so "thefoo" ~~ /&lt; foo bar ber &gt;/; # True
 say so "thefoo" ~~ /[ foo | bar | ber ]/;
 </code></pre>
 				</section>
+
+        <section>
+          <h2>Conjugations</h2>
+
+          <p>The <code>&amp;&amp;</code> tests if two regexes match the same part of string:</p>
+          <pre><code class="perl">
+say "Perl ۶ or Perl 6" ~~ / Perl \s+ \d /;
+# OUTPUT: «｢Perl ۶｣␤»
+
+say "Perl ۶ or Perl 6" ~~ /
+    Perl \s+ [\d &amp;&amp; <:Block('Basic Latin')>]
+/ # OUTPUT: «｢Perl 6｣␤»
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Regexes as subroutines</h2>
+
+          <p>Use its name in angle brackets:</p>
+          <pre><code class="plain">
+my regex quoted { \" &lt;( &lt;-["]&gt;+ )&gt; \" }
+
+say 'I love "Perl" and "Perl 6"'
+    ~~ /&lt;quoted&gt; &amp;&amp; .+ \d .+/;
+
+# OUTPUT: «｢"Perl 6"｣
+#            quoted =&gt ｢Perl 6｣␤»
+        </code></pre>
+        <p><code>&lt;(</code> is the left match marker and <code>)&gt;</code> is
+          the right match marker. Controls what gets captured in your match.</p>
+        </section>
+
+        <section>
+          <h2>Named Captures</h2>
+
+          <p>Use dollar sign, followed by the name and equals sign. The next atom will get captured (use square brackets to group multiple atoms for capture).</p>
+          <pre><code class="plain">
+say '2018-07-26T19:20:33-04:00' ~~ /
+    $&lt;year&gt;=\d**4 '-' $&lt;month&gt;=\d**2 '-' $&lt;day&gt;=[\d\d]
+  T $&lt;time&gt;=[\d\d]**3 % ':'
+/;
+
+say "TPM $&lt;year month day&gt;.join('.') is at $&lt;time&gt;"
+# OUTPUT: «TPM 2018.07.26 is at 19:20:33␤»
+        </code></pre>
+        </section>
+
+        <section>
+          <h2>Named Captures</h2>
+
+          <p>Outside the regex, <code>$&lt;…&gt;</code> is a shortcut for <code>$/&lt;…&gt;</code>.
+          The <code>$/</code> is the default variable storing the last match, but you can assign
+          matches to any variable:</p>
+          <pre><code class="plain">
+my $m := 'I really love Perl 6' ~~ / :s
+  (I|You) .+  $&lt;how>=&lt; love like >
+  $&lt;what>=.+
+/;
+
+say "$0 $&lt;how> $&lt;what>";      # OUTPUT: «I love Perl 6␤»
+say "$/[0] $/&lt;how> $/&lt;what>"; # OUTPUT: «I love Perl 6␤»
+say "$m[0] $m&lt;how> $m&lt;what>"; # OUTPUT: «I love Perl 6␤»
+
+</code></pre>
+        </section>
 
         <section>
           <h2>Ask The Community</h2>
