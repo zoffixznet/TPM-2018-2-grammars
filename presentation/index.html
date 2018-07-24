@@ -42,7 +42,7 @@
 
 		<div class="reveal">
 			<!-- Any section element inside of this container is displayed as a slide -->
-			<div class="slides">
+			<div class="slides" style="width: 90%; max-width: 970px; height: 90%; zoom: 1;">
 				<section>
 					<h2 style="font-size: 300%;">Intro Into Perl 6 Regexes and Grammars</h2>
 
@@ -205,7 +205,7 @@ say so "foo\nbar" ~~ /^ foo $$ \n ^^ bar $/; # True
 					<h2>Sigspace</h2>
 
           <p>Automatically puts <code>&lt;.ws&gt;</code> token between atoms in the regex,
-          which by default matches whitespace (<code>\s+</code>) or a word boundary</p>
+          which by default matches zero or more whitespace (as long as not within a word (<code>&lt;!ww&gt; \s*</code>):</p>
 					<pre><code class="perl">
 say so "This is neat!" ~~ /
   :s  This    is     neat \!
@@ -540,6 +540,277 @@ TPM.when: '2018-07-26T19:00:00-04:00'
 # OUTPUT: &laquo;TPM had a meeting at 19:00:00␤&raquo;
 </code></pre>
         </section>
+
+        <section>
+          <h2>Other Regex Types</h2>
+          <p>Along with <code>regex</code>, you can use
+          <code>rule</code>, and <code>token</code>:</p>
+
+          <pre><code class="perl">grammar {
+    regex TOP  { … }
+    rule  date { … }
+    token time { … }
+}
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Other Regex Types</h2>
+          <p>Along with <code>regex</code>, you can use
+          <code>rule</code>, and <code>token</code>:</p>
+
+          <ul>
+            <li style="margin-bottom: 20px"><strong><code>token</code></strong>— like <code>regex</code>, but has <code>:ratchet</code>
+              <br>(short: <code>:r</code>) enabled (does not backtrack)</li>
+            <li><strong><code>rule</code></strong>— like <code>token</code>, but also has <code>:sigspace</code> (short: <code>:s</code>) enabled</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Other Regex Types</h2>
+          <p>You can disable those adverbs locally:</p>
+
+          <pre><code class="perl">
+rule date { # :ratchet and :sigspace here
+    [ :!ratchet # no ratchet
+        [
+            :ratchet # ratchet again
+        ]
+        # no ratchet here
+        [ :!sigspace
+            # no ratchet and no sigspace here
+        ]
+    ]
+}
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Let's Parse Something</h2>
+          <p>Build a grammar to parse this data:</p>
+
+          <pre><code class="plain">[Grammars Talk]
+    name: Zoffix
+    lang: Perl 6
+    topic: grammars and regexes
+    length: 80
+[Perf Talk]
+    name: Zoffix
+    lang: Perl 6
+    topic: performance
+    length: 30
+</code></pre>
+        </section>
+
+        <section>
+          <h2>Let's Parse Something</h2>
+
+          <pre><code class="plain">[Grammars Talk]
+    name: Zoffix
+    […]
+</code></pre>
+
+          <pre><code class="perl">grammar TPM {
+    token key    { &lt;-[:\n]&gt;+         }
+    token value  { &lt;-[\]\n]&gt;+        }
+    rule row     { &lt;key&gt; ':' &lt;value&gt; }
+    rule header  { '[' ~ ']' &lt;value&gt; }
+    rule section { &lt;header&gt; &lt;row&gt;+   }
+    rule TOP     { &lt;section&gt;+        }
+}
+</code></pre>
+        </section>
+
+
+        <section>
+          <h2>Let's Parse Something</h2>
+
+          <pre><code class="perl">TPM.parse: q:to/END/;
+  [Grammars Talk]
+      name: Zoffix
+      lang: Perl 6
+      topic: grammars and regexes
+      length: 80
+  [Perf Talk]
+      name: Zoffix
+      lang: Perl 6
+      topic: performance
+      length: 30
+  END
+</code></pre>
+        </section>
+
+
+
+        <section>
+          <h2>Let's Parse Something</h2>
+
+          <pre><code class="perl">my %result;
+for $&lt;section&gt; {
+    %result{.&lt;header&gt;&lt;value&gt;} = .&lt;row&gt;.map({
+        ~.&lt;key&gt; =&gt; ~.&lt;value&gt;
+    }).hash
+}
+say %result;
+</code></pre>
+        </section>
+
+
+        <section>
+          <h2>Let's Parse Something</h2>
+
+          <pre><code class="perl"># OUTPUT:
+# {
+#   Grammars Talk =&gt; {
+#     lang =&gt; Perl 6, length =&gt; 80, name =&gt; Zoffix,
+#     topic =&gt; grammars and regexes
+#   },
+#   Perf Talk =&gt; {
+#     lang =&gt; Perl 6, length =&gt; 30, name =&gt; Zoffix,
+#     topic =&gt; performance
+#   }
+# }
+</code></pre>
+        </section>
+
+
+        <section>
+          <h2>Ewww?</h2>
+          <p>If we make changes in our tokens, it might be tough to make
+            appropriate changes here. Especially with large grammars.</p>
+          <pre><code class="perl">my %result;
+for $&lt;section&gt; {
+    %result{.&lt;header&gt;&lt;value&gt;} = .&lt;row&gt;.map({
+        ~.&lt;key&gt; =&gt; ~.&lt;value&gt;
+    }).hash
+}
+say %result;
+</code></pre>
+          <p>(Perl 6 core grammar is currently 5,570 lines long)</p>
+        </section>
+
+
+        <section>
+          <h2>Action Classes!</h2>
+          <p>As soon as a token (rule/regex) is parsed, a method
+            with the same name in the Actions class will be called, with
+          the match object for that token as the argument</p>
+          <pre><code class="perl">grammar Grammar {
+    token TOP   { &lt;stuff&gt; }
+    token stuff { &hellip;       }
+}
+class Actions {
+    method TOP   ($match) { $match.make: $match.made }
+    method stuff ($/)     { make 42 }
+    # naming param `$/` lets us use some shortcuts
+}
+Grammar.parse('…', :actions(Actions)).made.say # 42
+</code></pre>
+        </section>
+
+
+        <section>
+          <h2>Make / Made</h2>
+          <p>It's really, really simple:</p>
+          <pre><code class="perl">class PretendMatch {
+    has $!stuff;
+    method make($stuff) {
+        $!stuff = $stuff
+    }
+    method made { $!stuff }
+}
+</code></pre>
+          <p>Just a way to attach and later retrieve arbitrary<br>data
+            to/from the <code>Match</code> object</p>
+        </section>
+
+
+        <section>
+          <h2>Action Classes!</h2>
+          <p>Methods make stuff for the token they're responsible for:</p>
+          <pre><code class="perl">class TPMActions {
+    method row     ($/) { make ~$&lt;key&gt; =&gt; ~$&lt;value&gt; }
+    method header  ($/) { make ~$&lt;value&gt; }
+    method section ($/) {
+        make $&lt;header&gt;.made =&gt; $&lt;row&gt;&raquo;.made.hash
+    }
+    method TOP ($/) { make $&lt;section&gt;&raquo;.made.hash }
+}
+</code></pre>
+          <p>You don't need to define a method for every token</p>
+        </section>
+
+
+        <section>
+          <h2>Action Classes!</h2>
+          <p>Same as before, except now we give our Actions class a
+            <code>:actions</code> named argument:</p>
+          <pre><code class="perl"> my $match := TPM.parse: q:to/END/, :actions(TPMActions);
+    [Grammars Talk]
+        name: Zoffix
+
+        […]
+    END
+
+dd $match.made
+</code></pre>
+        </section>
+
+
+        <section>
+          <h2>Action Classes!</h2>
+          <p>Now, we're free to change individual tokens and the corresponding
+          actions methods,<br> without impacting the rest of the stuff</p>
+          <pre><code class="perl"># {
+#     Grammars Talk =&gt; {
+#         lang =&gt; Perl 6, length =&gt; 80, name =&gt; Zoffix,
+#         topic =&gt; grammars and regexes
+#     },
+#     Perf Talk =&gt; {
+#         lang =&gt; Perl 6, length =&gt; 30, name =&gt; Zoffix,
+#         topic =&gt; performance
+#     }
+# }
+</code></pre>
+        </section>
+
+
+
+        <section>
+          <h2>Helpful Modules</h2>
+          <p>Install <code><a href="https://github.com/jnthn/grammar-debugger"
+            >Grammar::Debugger</a></code> (also includes
+            <code>Grammar::Tracer</code>).</p>
+          <pre><code class="perl">use Grammar::Tracer;
+grammar {
+    token TOP   { &lt;stuff&gt; }
+    token stuff { &lt;some&gt; &lt;other&gt; }
+    token some  { abc }
+    token other { \d+ }
+}.parse: 'abcdef';
+</code></pre>
+          <p>Simply <code>use</code> one of them…</p>
+        </section>
+
+				<section>
+					<h2>Helpful Modules</h2>
+          <p>…and pretty output will show where your grammar is failing to match:</p>
+
+
+          <img src="2018-pics/debugger.png" alt="" width=600>
+				</section>
+
+
+				<section>
+					<h2>Grammar Book</h2>
+          <p>By core dev moritz++</p>
+
+
+          <a href="https://www.amazon.com/Parsing-Perl-Regexes-Grammars-Recursive/dp/1484232275"><img src="2018-pics/grammar-book.png" alt="">
+            </a>
+
+          <p>available on <a href="https://www.amazon.com/Parsing-Perl-Regexes-Grammars-Recursive/dp/1484232275">Amazon</a> and <a href="https://www.apress.com/us/book/9781484232279">Apress</a></p>
+				</section>
 
 
 
