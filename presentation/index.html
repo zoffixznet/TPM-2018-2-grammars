@@ -4,7 +4,7 @@
 	<head>
 		<meta charset="utf-8">
 
-		<title>Faster Perl 6 Programs</title>
+		<title>Intro Into Perl 6 Regexes and Grammars</title>
 
 		<meta name="description" content="Perl 6: Grammars">
 		<meta name="author" content="Zoffix Znet">
@@ -113,7 +113,7 @@ say so "I ♥ Perl 6" ~~ /
 				</section>
 
       	<section>
-					<h2>Content of variables</h2>
+					<h2>Text Content of variables</h2>
 
           <p>The default is to match content as plain text. Put variable
           into angle brackets to interpret it as regex.</p>
@@ -204,8 +204,8 @@ say so "foo\nbar" ~~ /^ foo $$ \n ^^ bar $/; # True
         <section>
 					<h2>Sigspace</h2>
 
-          <p>Automatically puts <code>&lt;.ws&gt;</code> token between atoms in the regex,
-          which by default matches zero or more whitespace (as long as not within a word (<code>&lt;!ww&gt; \s*</code>):</p>
+          <p>Automatically puts <code>&lt;.ws&gt;</code> token after terms in the regex,
+          which by default matches zero or more whitespace characters (as long as not within a word (<code>&lt;!ww&gt; \s*</code>):</p>
 					<pre><code class="perl">
 say so "This is neat!" ~~ /
   :s  This    is     neat \!
@@ -346,7 +346,7 @@ say "Perl ۶ or Perl 6" ~~ /
         </section>
 
         <section>
-          <h2>Regexes as subroutines</h2>
+          <h2>Named, Standalone Regexes</h2>
 
           <p>Use its name in angle brackets:</p>
           <pre><code class="plain">
@@ -359,21 +359,23 @@ say 'I love "Perl" and "Perl 6"'
 #            quoted =&gt ｢Perl 6｣␤»
         </code></pre>
         <p><code>&lt;(</code> is the left match marker and <code>)&gt;</code> is
-          the right match marker. Controls what gets captured in your match.</p>
+          the right match marker. Controls what gets captured in your match.
+          <br>
+          (<code>&lt;(</code> is like <code>\K</code> in Perl 5)</p>
         </section>
 
         <section>
           <h2>Named Captures</h2>
 
-          <p>Use dollar sign, followed by the name and equals sign. The next atom will get captured (use square brackets to group multiple atoms for capture).</p>
+          <p>Use dollar sign, followed by the name and equals sign. The next term will get captured (use square brackets to group multiple terms for capture).</p>
           <pre><code class="plain">
 say '2018-07-26T19:00:00-04:00' ~~ /
     $&lt;year&gt;=\d**4 '-' $&lt;month&gt;=\d**2 '-' $&lt;day&gt;=[\d\d]
   T $&lt;time&gt;=[\d\d]**3 % ':'
 /;
 
-say "TPM $&lt;year month day&gt;.join('.') is at $&lt;time&gt;"
-# OUTPUT: «TPM 2018.07.26 is at 19:00:00␤»
+say "TPM is at $&lt;time&gt; on $&lt;year month day&gt;.join('.')"
+# OUTPUT: «TPM is at 19:00:00 on 2018.07.26␤»
         </code></pre>
         </section>
 
