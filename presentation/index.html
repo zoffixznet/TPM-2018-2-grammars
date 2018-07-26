@@ -64,6 +64,12 @@
 				</section>
 
 				<section>
+				  <h2>Question Policy</h2>
+
+					<p>Just raise your hand and ask right away</p>
+				</section>
+
+				<section>
 					<h2>Status Quo: PCRE</h2>
 
 					<p>The "Perl-Compatible Regular Expressions" are very cryptic,
@@ -802,6 +808,70 @@ grammar {
           <img src="2018-pics/debugger.png" alt="" width=600>
 				</section>
 
+        <section>
+          <h2>More Grammar Features</h2>
+          <p>…that we won't talk about to today.</p>
+          <pre><code class="perl">
+# Word boundaries
+/ &lt;|w&gt; &lt;!|w&gt; &lt;ww&gt; &lt;!ww&gt;    /
+/ &laquo;'Perl 6'&raquo;  &lt;&lt;'Perl 6'&gt;&gt; /
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>More Grammar Features</h2>
+          <p>…that we won't talk about to today.</p>
+          <pre><code class="perl">
+# Look arounds
+/ &lt;!before &hellip;&gt; &lt;after &hellip;&gt; /
+/ &lt;?[xyz]&gt; &lt;![xyz]&gt; /
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>More Grammar Features</h2>
+          <p>…that we won't talk about to today.</p>
+          <pre><code class="perl">
+# Executing arbitrary code and optionally using its value:
+/   { ... }  /
+/  &lt;{ ... }&gt; /
+/ &lt;!{ ... }&gt; /
+/ &lt;?{ ... }&gt; /
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>More Grammar Features</h2>
+          <p>…that we won't talk about to today.</p>
+          <pre><code class="perl">
+# The &quot;between&quot; operator and FAILGOAL method
+grammar A {
+    token TOP { '[' ~ ']' &lt;stuff-inside&gt;  };
+    method FAILGOAL($goal) {
+        die &quot;Cannot find $goal near position {self.pos}&quot;
+    }
+}
+
+</code></pre>
+        </section>
+
+        <section>
+          <h2>More Grammar Features</h2>
+          <p>…that we won't talk about to today.</p>
+          <pre><code class="perl">
+# Proto-regexes (sort of like multi-dispatch for regexes)
+regex statement { &lt;term&gt; &lt;operator&gt; &lt;term&gt; }
+regex operator:sym&lt;+&gt; { &lt;sym&gt; }
+regex operator:sym&lt;-&gt; { &lt;sym&gt; }
+...
+method operator:sym&lt;-&gt; ($/) { say &quot;It's a minus op&quot; }
+method operator:sym&lt;+&gt; ($/) { say &quot;It's a plus op&quot;  }
+
+</code></pre>
+        </section>
 
 				<section>
 					<h2>Grammar Book</h2>
